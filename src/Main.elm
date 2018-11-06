@@ -19,6 +19,12 @@ type Instruction
     = AddOne
     | RemoveOne
     | Block (List Instruction)
+    | If Function Instruction
+    | While Function Instruction
+
+
+type Function
+    = LessThan Int
 
 
 type alias Model =
@@ -56,10 +62,7 @@ executeInstructions instructions world =
 
         instruction :: rest ->
             case
-                world
-                    |> executeInstruction instruction
-                    |> increaseExecutions
-                    |> checkExecutionsLimit
+                executeInstruction instruction world
             of
                 Ok newWorld ->
                     executeInstructions rest (Ok newWorld)
@@ -70,7 +73,11 @@ executeInstructions instructions world =
 
 executeInstruction : Instruction -> Result String World -> Result String World
 executeInstruction instruction maybeWorld =
-    case maybeWorld of
+    case
+        maybeWorld
+            |> increaseExecutions
+            |> checkExecutionsLimit
+    of
         Ok world ->
             case instruction of
                 AddOne ->
@@ -82,8 +89,31 @@ executeInstruction instruction maybeWorld =
                 Block instructions ->
                     executeInstructions instructions (Ok world)
 
+                If function nestedInstruction ->
+                    if executeFunction function world then
+                        executeInstruction nestedInstruction (Ok world)
+
+                    else
+                        Ok world
+
+                While function nestedInstruction ->
+                    if executeFunction function world then
+                        Ok world
+                            |> executeInstruction nestedInstruction
+                            |> executeInstruction (While function nestedInstruction)
+
+                    else
+                        Ok world
+
         Err reason ->
             Err reason
+
+
+executeFunction : Function -> World -> Bool
+executeFunction function world =
+    case function of
+        LessThan value ->
+            world.somevar < value
 
 
 executionsLimit : Int
@@ -120,6 +150,9 @@ view model =
             [ button [ onClick (AddInstruction AddOne) ] [ text "+" ]
             , button [ onClick (AddInstruction RemoveOne) ] [ text "-" ]
             , button [ onClick (AddInstruction (Block [ AddOne, AddOne, AddOne, AddOne, AddOne ])) ] [ text "+5" ]
+            , button [ onClick (AddInstruction (If (LessThan 10) (Block [ AddOne, AddOne, AddOne, AddOne, AddOne ]))) ] [ text "+5 if <10" ]
+            , button [ onClick (AddInstruction (While (LessThan 10) AddOne)) ] [ text "+1 while <10" ]
+            , button [ onClick (AddInstruction (While (LessThan 10) RemoveOne)) ] [ text "-1 while <10" ]
             , button [ onClick Execute ] [ text "Execute" ]
             ]
         ]
