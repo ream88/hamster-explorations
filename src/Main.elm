@@ -22,7 +22,6 @@ type Instruction
 type alias Model =
     { world : Result String World
     , instructions : List Instruction
-    , executions : Int
     }
 
 
@@ -34,7 +33,6 @@ init : Model
 init =
     { world = Ok 0
     , instructions = []
-    , executions = 0
     }
 
 
@@ -45,48 +43,55 @@ update msg model =
             { model | instructions = Instruction :: model.instructions }
 
         Execute ->
-            executeInstructions { model | executions = 0 }
+            executeInstructions { model | world = Ok 0 }
 
 
 executeInstructions : Model -> Model
 executeInstructions model =
     case model.instructions of
-        head :: tail ->
-            let
-                newModel =
-                    { model | executions = model.executions + 1 }
-            in
+        [] ->
+            model
+
+        instruction :: instructions ->
             case
                 model.world
-                    |> checkLimit newModel
-                    |> executeInstruction head
+                    |> executeInstruction instruction
+                    |> increaseExecutions
+                    |> checkExecutionsLimit
             of
                 Ok newWorld ->
                     executeInstructions
-                        { newModel
+                        { model
                             | world = Ok newWorld
-                            , instructions = tail
+                            , instructions = instructions
                         }
 
                 Err reason ->
                     { model | world = Err reason, instructions = [] }
 
-        [] ->
-            model
-
-
-checkLimit : Model -> Result String World -> Result String World
-checkLimit model _ =
-    if model.executions > 10 then
-        Err "Limit of executions reached"
-
-    else
-        model.world
-
 
 executeInstruction : Instruction -> Result String World -> Result String World
 executeInstruction instruction world =
     world
+
+
+checkExecutionsLimit : Result String World -> Result String World
+checkExecutionsLimit world =
+    case world of
+        Ok executions ->
+            if executions > 3 then
+                Err "Limit of executions reached"
+
+            else
+                world
+
+        err ->
+            err
+
+
+increaseExecutions : Result String World -> Result String World
+increaseExecutions world =
+    world |> Result.map (\executions -> executions + 1)
 
 
 view : Model -> Html Msg
