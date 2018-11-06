@@ -11,12 +11,14 @@ main =
 
 
 type Msg
-    = AddInstruction
+    = AddInstruction Instruction
     | Execute
 
 
 type Instruction
-    = Instruction
+    = AddOne
+    | RemoveOne
+    | Block (List Instruction)
 
 
 type alias Model =
@@ -26,12 +28,12 @@ type alias Model =
 
 
 type alias World =
-    Int
+    { executions : Int, somevar : Int }
 
 
 init : Model
 init =
-    { world = Ok 0
+    { world = Ok (World 0 0)
     , instructions = []
     }
 
@@ -39,47 +41,61 @@ init =
 update : Msg -> Model -> Model
 update msg model =
     case msg of
-        AddInstruction ->
-            { model | instructions = Instruction :: model.instructions }
+        AddInstruction instruction ->
+            { model | instructions = List.append model.instructions [ instruction ] }
 
         Execute ->
-            executeInstructions { model | world = Ok 0 }
+            { model | world = executeInstructions model.instructions model.world }
 
 
-executeInstructions : Model -> Model
-executeInstructions model =
-    case model.instructions of
+executeInstructions : List Instruction -> Result String World -> Result String World
+executeInstructions instructions world =
+    case instructions of
         [] ->
-            model
+            world
 
-        instruction :: instructions ->
+        instruction :: rest ->
             case
-                model.world
+                world
                     |> executeInstruction instruction
                     |> increaseExecutions
                     |> checkExecutionsLimit
             of
                 Ok newWorld ->
-                    executeInstructions
-                        { model
-                            | world = Ok newWorld
-                            , instructions = instructions
-                        }
+                    executeInstructions rest (Ok newWorld)
 
                 Err reason ->
-                    { model | world = Err reason, instructions = [] }
+                    Err reason
 
 
 executeInstruction : Instruction -> Result String World -> Result String World
-executeInstruction instruction world =
-    world
+executeInstruction instruction maybeWorld =
+    case maybeWorld of
+        Ok world ->
+            case instruction of
+                AddOne ->
+                    Ok { world | somevar = world.somevar + 1 }
+
+                RemoveOne ->
+                    Ok { world | somevar = world.somevar - 1 }
+
+                Block instructions ->
+                    executeInstructions instructions (Ok world)
+
+        Err reason ->
+            Err reason
+
+
+executionsLimit : Int
+executionsLimit =
+    1000
 
 
 checkExecutionsLimit : Result String World -> Result String World
 checkExecutionsLimit world =
     case world of
-        Ok executions ->
-            if executions > 3 then
+        Ok { executions } ->
+            if executions >= executionsLimit then
                 Err "Limit of executions reached"
 
             else
@@ -90,8 +106,8 @@ checkExecutionsLimit world =
 
 
 increaseExecutions : Result String World -> Result String World
-increaseExecutions world =
-    world |> Result.map (\executions -> executions + 1)
+increaseExecutions =
+    Result.map (\world -> { world | executions = world.executions + 1 })
 
 
 view : Model -> Html Msg
@@ -101,7 +117,9 @@ view model =
             |> Debug.toString
             |> text
         , p []
-            [ button [ onClick AddInstruction ] [ text "Add" ]
+            [ button [ onClick (AddInstruction AddOne) ] [ text "+" ]
+            , button [ onClick (AddInstruction RemoveOne) ] [ text "-" ]
+            , button [ onClick (AddInstruction (Block [ AddOne, AddOne, AddOne, AddOne, AddOne ])) ] [ text "+5" ]
             , button [ onClick Execute ] [ text "Execute" ]
             ]
         ]
