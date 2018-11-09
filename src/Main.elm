@@ -34,7 +34,7 @@ type alias Model =
 
 
 type alias World =
-    { executions : Int, somevar : Int }
+    { executions : Int, model : Int }
 
 
 init : Model
@@ -81,10 +81,10 @@ executeInstruction instruction maybeWorld =
         Ok world ->
             case instruction of
                 AddOne ->
-                    Ok { world | somevar = world.somevar + 1 }
+                    Ok { world | model = world.model + 1 }
 
                 RemoveOne ->
-                    Ok { world | somevar = world.somevar - 1 }
+                    Ok { world | model = world.model - 1 }
 
                 Block instructions ->
                     executeInstructions instructions (Ok world)
@@ -113,7 +113,7 @@ executeFunction : Function -> World -> Bool
 executeFunction function world =
     case function of
         LessThan value ->
-            world.somevar < value
+            world.model < value
 
 
 executionsLimit : Int
@@ -143,10 +143,7 @@ increaseExecutions =
 view : Model -> Html Msg
 view model =
     div []
-        [ model
-            |> Debug.toString
-            |> text
-        , p []
+        [ p []
             [ button [ onClick (AddInstruction AddOne) ] [ text "+" ]
             , button [ onClick (AddInstruction RemoveOne) ] [ text "-" ]
             , button [ onClick (AddInstruction (Block [ AddOne, AddOne, AddOne, AddOne, AddOne ])) ] [ text "+5" ]
@@ -155,4 +152,9 @@ view model =
             , button [ onClick (AddInstruction (While (LessThan 10) RemoveOne)) ] [ text "-1 while <10" ]
             , button [ onClick Execute ] [ text "Execute" ]
             ]
+        , model
+            |> Debug.toString
+            |> text
+            |> List.singleton
+            |> pre []
         ]
